@@ -1,16 +1,24 @@
 ---------------------------------------------------------------------------------------------------
 --                                          Communicator
 --
--- This library is a wrapper around the ICommLib in WildStar, and provides an interface for
+-- This library is a wrapper around the ICCommLib in WildStar, and provides an interface for
 -- Roleplay Addons that can be used to transfer information between the both of them.
 -- The Libary can also be used by different Addons if desired to transfer information, this just
 -- requires some modifications to the transfer protocol.
 ---------------------------------------------------------------------------------------------------
 local Communicator = {}
 local Message = {}
+require "ICCommLib"
 
-require "ICComm"
+local MAJOR, MINOR = "Communicator-1.0", 1
+-- Get a reference to the package information if any
+local APkg = Apollo.GetPackage(MAJOR)
+-- If there was an older version loaded we need to see if this is newer
+if APkg and (APkg.nVersion or 0) >= MINOR then
+	return -- no upgrade needed
+end
 
+local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
 ---------------------------------------------------------------------------------------------------
 -- Local Functions
 ---------------------------------------------------------------------------------------------------
@@ -31,45 +39,6 @@ local function split(str, sep)
   end
   
   return unpack(result)
-end
-
--- Serializes a table into a string format, that allows us to transmit a table over the
--- the ICommLib. The serialized format will look like this:
---
---    --k1=v1,k2=v2,k3=v3
---
--- The function only supports lineair tables for now, consisting of key-value pairs.
-local function tabletostring(tTable)
-  if(type(tTable) ~= "table") then
-    error("tabletostring: Attempt to serialize non-table value: " .. tostring(tTable))
-  end
-  
-  local result = "--"
-  
-  -- Serialize the table, ignoring functions and table entries.
-  for k,v in pairs(tTable) do
-    if(type(v) ~= "function" and type(v) ~= "table") then
-      result = result .. tostring(k) .. "=" .. tostring(v) .. ","
-    end
-  end
-  
-  -- strip the final , and return the result
-  return result:sub(1,-2)
-end
-
--- Deserializes a string back into a table format.
--- The function expects the string to match the format and will attempt to build a single
--- lineair table.
-local function stringtotable(str)
-  local data = { split(str:sub(3,-1)) }
-  local result = {}
-  
-  for i = 1 , #data do
-    local k,v = split(data[i])
-    result[k] = v
-  end
-  
-  return result
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -205,43 +174,32 @@ end
 -- Message serialization & deserialization
 ---------------------------------------------------------------------------------------------------
 
--- Serializes the Message into a string that can be send over the ICommLib channel and read by another
--- Communicator plugin and parsed.
--- The format of the string is:
---
---      "{version,command,eMessageType,Addon}payload{sequence,origin,destination}
---
--- This shortens the amount of data we can send in a single burst, but large parts can be split up
--- in chunks with increasing sequence numbers, the library will parse them together.
 function Message:Serialize()
-  return string.format("{%d,%s,%d}%s{%d,%s,%s}",
-    self:GetProtocolVersion(),
-    self:GetCommand(),
-    self:GetType(),
-    tabletostring(self:GetPayload()),
-    self:GetSequence(),
-    self:GetOrigin(),
-    self:GetDestination())
+	local message ={
+		version = self:GetProtocolVersion(),
+		command = self:GetCommand(),
+		type = self:GetType(),
+		tPayload = self:GetPayload(),
+		sequence = self:GetSequence(),
+		origin = self:GetOrigin(),
+		destination = self:GetDestination())
+	}
+	return JSON:encode(message)   
 end
 
--- Deserializes the given string and transforms it back into the data and fills
--- the properties of the instance.
 function Message:Deserialize(strPacket)
   if(strPacket == nil) then return end
-  
-  -- Split the string in it's three parts first
-  local version, command, type = split(strPacket:match("{[^}]*}"):sub(2,-2), ",")
-  local tPayload = stringtotable(strPacket:match("}[^}]*{"):sub(2,-2))
-  local sequence, origin, destination = split(strPacket:match("{[^}]*}", strPacker:find("}")):sub(2,-2))
-  
+  local message = JSON:decode(strPacket)
+
   -- Set out properties
-  self:SetProtocolVersion(version)
-  self:SetCommand(command)
-  self:SetType(type)
-  self:SetPayload(tPayload)
-  self:SetSequence(sequence)
-  self:SetOrigin(origin)
-  self:SetDestination(destination)
+  self:SetProtocolVersion(message.version)
+  self:SetCommand(message.command)
+  self:SetType(message.type)
+  self:SetPayload(message.tPayload)
+  self:SetSequence(message.sequence)
+  self:SetOrigin(message.origin)
+  self:SetDestination(message.destination)
+  
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -275,8 +233,11 @@ Communicator.Trait_Biography = "bio"
 ---------------------------------------------------------------------------------------------------
 -- Communicator Initialization
 ---------------------------------------------------------------------------------------------------
-function Communicator:new()
-
+function Communicator:new(o)
+	o = o or {}
+	setmetatable(o, self)
+	self.__index = self
+	return o
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -521,3 +482,5 @@ function Communicator:FetchTrait(strTarget, strTraitName)
     return tTrait.data, tTrait.revision
   end
 end
+
+Apollo.RegisterPackage(Communicator:new(), MAJOR, MINOR, {"Lib:dkJSON-2.5"})
