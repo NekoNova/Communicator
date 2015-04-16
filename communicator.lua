@@ -8,17 +8,21 @@
 ---------------------------------------------------------------------------------------------------
 local Communicator = {}
 local Message = {}
+
 require "ICCommLib"
 
 local MAJOR, MINOR = "Communicator-1.0", 1
+
 -- Get a reference to the package information if any
 local APkg = Apollo.GetPackage(MAJOR)
+
 -- If there was an older version loaded we need to see if this is newer
 if APkg and (APkg.nVersion or 0) >= MINOR then
 	return -- no upgrade needed
 end
 
 local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
+
 ---------------------------------------------------------------------------------------------------
 -- Local Functions
 ---------------------------------------------------------------------------------------------------
@@ -182,7 +186,7 @@ function Message:Serialize()
 		tPayload = self:GetPayload(),
 		sequence = self:GetSequence(),
 		origin = self:GetOrigin(),
-		destination = self:GetDestination())
+		destination = self:GetDestination()
 	}
 	return JSON:encode(message)   
 end
@@ -268,10 +272,10 @@ function Communicator:OnLoad()
   -- Register our timeout handlers for all timers.
   Apollo.RegisterTimerHandler("Communicator_Timeout", "OnTimerTimeout", self)
   Apollo.RegisterTimerHandler("Communicator_TimeoutShutdown", "OnTimerTimeoutShutdown", self)
-  Apollo.RegisterTimerHandler("Communicator_Queue", "OnTimerQueue", self)
+  Apollo.RegisterTimerHandler("Communicator_Queue", "ProcessMessageQueue", self)
   Apollo.RegisterTimerHandler("Communicator_QueueShutdown", "OnTimerQueueShutdown", self)
   Apollo.RegisterTimerHandler("Communicator_Setup", "OnTimerSetup", self)
-  Apollo.RegisterTimerHandler("Communicator_TraitQueue", "OnTimerTraitQueue", self)
+  Apollo.RegisterTimerHandler("Communicator_TraitQueue", "ProcessTraitQueue", self)
   Apollo.RegisterTimerHandler("Communicator_CleanupCache", "OnTimerCleanupCache", self)
   
   -- Create the timers
@@ -304,7 +308,7 @@ function Communicator:OnRestore(eLevel, tDate)
   end
 end
 
-function Communicator:Initialize()
+function Communicator:OnTimerSetup()
   if(GameLib.GetPlayerUnit() == nil) then
     Apollo.CreateTimer("Communicator_Setup", 1, false)
     return
@@ -483,4 +487,422 @@ function Communicator:FetchTrait(strTarget, strTraitName)
   end
 end
 
+function Communicator:CacheTrait(strTarget, strTrait, data, nRevision)
+  if(strTarget == nil) then return end
+  
+  if(strTarget == nil or strTarget == self:GetOriginName()) then
+    self.tLocalTraits[strTrait] = { data = data, revision = nRevision }
+    self:Log(Communicator.Debug_Access, string.format("Caching own %s: (%d) %s", strTrait, nRevision or 0, tostring(data)))
+    Event_FireGenericEvent("Communicator_TraitChanged", { player = self:GetOriginName(), trait = strTrait, data = data, revision = nRevision })
+  else
+    local tPlayerTraits = self.tCachedPlayerData[strTarget] or {}
+    
+    if(nRevision ~= 0 and tPlayerTraits.revision == nRevision) then
+      tPlayerTraits.time = os.time()
+      return
+    end
+    
+    if(data == nil) then return end
+    
+    tPlayerTraits[strTrait] = { data = data, revision = nRevision, time = os.time() }
+    self.tCachedPlayerData[strTarget] = tPlayerTraits
+    self:Log(Communicator.Debug_Access, string.format("Caching %s's %s: (%d) %s", strTarget, strTrait, nRevision or 0, tostring(data)))
+    Event_FireGenericEvent("Communicator_TraitChanged", { player = strTarget, trait = strTrait, data = data, revision = nRevision })
+  end
+end  
+
+function Communicator:SetLocalTrait(strTrait, data)
+  local value, revision = self:FetchTrait(nil, strTrait)
+  
+  if(value == data) then return end
+  if(strTrait == "state" or strTrait == "rpflag") then revision = 0 else revision = (revision or 0) + 1 end
+  self:CacheTrait(nil, strTrait, data, revision)
+end
+
+function Communicator:GetLocalTrait(strTrait)
+  return self:FetchTrait(nil, strTrait)
+end
+
+function Communicator:QueryVersion(strTarget)
+  if(strTarget == nil or strTarget == self:GetOriginName()) then
+    local aProtocols = {}
+    
+    for strAddonProtocol, _ in pairs(self.tApiProtocolHandlers) do
+      table.insert(aProtocols, strAddonProtocol)
+    end
+    
+    return Communicator.Version, aProtocols
+  end
+  
+  local tPlayerTraits = self.tCachedPlayerData[strTarget] or {}
+  local tVersionInfo = tPlayerTraits["__rpVersion"] or {}
+  local nLastTime = self:TimeSinceLastAddonProtocolCommand(strTarget, nil, "version")
+  
+  if(nLastTime < Communicator.TTL_Version) then
+    return tVersionInfo.version, tVersionInfo.addons
+  end
+  
+  self:MarkAddonProtocolCommand(strTarget, nil, "version")
+  self:Log(Communicator.Debug_Access, string.format("Fetching %s's version", strTarget))
+  
+  if(tVersionInfo.version == nil or (os.time() - (tVersionInfo.time or 0) > Communicator.TTL_Version)) then
+    local mMessage = Message:new()
+    
+    mMessage:SetDestination(strTarget)
+    mMessage:SetType(Message.Type_Request)
+    mMessage:SetCommand("version")
+    
+    self:SendMessage(mMessage)
+  end
+  
+  return tVersionInfo.version, tVersionInfo.addons
+end
+
+function Communicator:StoreVersion(strTarget, strVersion, aProtocols)
+  if(strTarget == nil or strVersion == nil) then return end
+  
+  local tPlayerTraits = self.tCachedPlayerData[strTarget] or {}
+  tPlayerTraits["__rpVersion"] = { version = strVersion, protocols = aProtocols, time = os.time() }
+  self.tCachedPlayerData[strTarget] = tPlayerTraits
+  
+  self:Log(Communicator.Debug_Access, string.format("Storing %s's version: %s", strTarget, strVersion))
+  Event_FireGenericEvent("Communicator_VersionUpdated", { player = strTarget, version = strVersion, protocols = aProtocols })
+end
+
+function Communicator:GetAllTraits(strTarget)
+  local tPlayerTraits = self.tCachedPlayerData[strTarget] or {}
+  self:Log(Communicator.Debug_Access, string.format("Fetching %s's full trait set (version: %s)", strTarget, strVersion))
+  
+  if(self:TimeSinceLastAddonProtocolCommand(strTarget, nil, "getall") > Communicator.TTL_GetAll) then
+    local mMessage = Message:new()
+    
+    mMessage:SetDestination(strTarget)
+    mMessage:SetType(Message.Type_Request)
+    mMessage:SetCommand("getall")
+    
+    self:SendMessage(mMessage)
+    self:MarkAddonProtocolCommand(strTarget, nil, "getall")
+  end
+  
+  local result = {}
+  
+  for key, data in pairs(tPlayerTraits) do
+    if(key:sub(1,2) ~= "__") then
+      tResult[key] = data.data
+    end
+  end
+  
+  return tResult
+end
+
+function Communicator:StoreAllTraits(strTarget, tPlayerTraits)
+  self:Log(Communicator.Debug_Access, string.format("Storing new trait cache for %s", strTarget))
+  self.tCachedPlayerData[strTarget] = tPlayerTraits
+  
+  local tResult = {}
+  
+  for key, data in pairs(tPlayerTraits) do
+    if(key:sub(1,2) ~= "__") then
+      tResult[key] = data.data
+    end
+  end
+  
+  Event_FireGenericEvent("Communicator_PlayerUpdated", { player = strTarget, traits = tResult })
+end
+
+function Communicator:TimeSinceLastAddonProtocolCommand(strTarget, strAddonProtocol, strCommand)
+  local strCommandId = string.format("%s:%s:%s", strTarget, strAddonProtocol or "base", strCommand)
+  local nLastTime = self.tFloodPrevent[strCommandId] or 0
+  
+  return (os.time() - nLastTime)
+end
+
+function Communicator:MarkAddonProtocolCommand(strTarget, strAddonProtocol, strCommand)
+  local strCommandId = string.format("%s:%s:%s", strTarget, strAddonProtocol or "base", strCommand)
+  self.tFloodPrevent[strCommandId] = os.time()
+end
+  
+function Communicator:OnSyncMessageReceived(channel, strMessage, idMessage)
+  local mMessage = Message:new()
+  mMessage:Deserialize(strMessage)
+  
+  if(tonumber(mMessage:GetProtocolVersion() or 0) > Message.ProtocolVersion) then
+    Print("Communicator: Warning :: Received packet for unrecognized version " .. mMessage:GetProtocolVersion())
+    return
+  end
+  
+  if(mMessage:GetDestination() == self:GetOriginName()) then
+    self:ProcessMessage(mMessage)
+  end
+end
+
+function Communicator:ProcessMessage(mMessage)
+  -- Is this ever called?
+  if(eType == Message.Type_Error) then
+    local tData = self.tOutgoingRequests[mMessage:GetSequence()] or {}
+    
+    if(tData.handler) then
+      tData.handler(mMessage)
+      self.tOutgoingRequests[mMessage:GetSequence()] = nil
+      return
+    end
+  end
+  
+  if(mMessage:GetAddonProtocol() == nil) then
+    local eType = mMessage:GetType()
+    local tPayload = mMessage:GetPayload() or {}
+  
+    if(eType == Message.Type_Request) then
+      if(mMessage:GetCommand() == "get") then
+        local aReplies = {}
+        
+        for _, tTrait in ipairs(tPayload) do
+          local data, revision = self:FetchTrait(nil, tTrait.trait or "")
+          
+          if(data ~= nil) then
+            local tResponse = { trait = tTait.trait, revision = revision }
+            
+            if(tPayload.revision == 0 or revision ~= tPayload.revision) then
+              tResponse.data = data
+            end
+            
+            table.insert(aReplies, tResponse)
+          else
+            table.insert(aReplies, { trait = tTrait.trait, revision = 0 })
+          end
+        end
+        
+        local mReply = Self:Reply(mMessage, aReplies)
+        self:SendMessage(mReply)
+      elseif(mMessage:GetCommand() == "version") then
+        local aProtocols = {}
+        
+        for strAddonProtocol, _ in pairs(self.tApiProtocolHandlers) do
+          table.insert(aProtocols, strAddonProtocol)
+        end
+        
+        local mReply = self:Reply(mMessage, { version = Communicator.Version, protocols = aProtocols })
+        self:SendMessage(mReply)
+      elseif(mMessage:GetCommand() == "getall") then
+        local mReply = self:Reply(mMessage, self.tLocalTraits)
+        self:SendMessage(mReply)
+      else
+        local mReply = self:Reply(packet, { error = self.Error_UnimplementedCommand })
+        mReply:SetType(Message.Type_Error)
+        self:SendMessage(mReply)
+      end
+    elseif(eType == Message.Type_Reply) then
+      if(mMessage:GetCommand() == "get") then
+        for _, tTrait in ipairs(tPayload) do
+          self:CacheTrait(mMessage:GetOrigin(), tTrait.trait, tTrait.data, tTrait.revision)
+        end
+      elseif(mMessage:GetCommand() == "version") then
+        self:StoreVersion(mMessage:GetOrigin(), tPayload.version, tPayload.protocols)
+      elseif(mMessage:GetCommand() == "getall") then
+        self:StoreAllTraits(mMessage:GetOrigin(), tPayload)
+      end
+    elseif(eType == Message.Type_Error) then
+      if(mMessage:GetCommand() == "getall") then
+        Event_FireGenericEvent("Communicator_PlayerUpdated", { player = mMessage:GetOrigin(), unsupported = true })
+      end
+    end
+  else
+    local aAddon = self.tApiProtocolHandlers[mMessage:GetAddonProtocol()]
+    
+    if(aAddon ~= nil or table.getn(aAddon) == 0) then
+      for _, fHandler in ipairs(aAddon) do
+        fHandler(mMessage)
+      end
+    elseif(mMessage:GetType() == Message.Type_Request) then
+      local mError = self:Reply(mMessage, { type = Communicator.Error_UnimplementedProtocol })
+      mError:SetType(Message.Type_Error)
+      self:SendMessage(mError)
+    end
+  end
+    
+  if(mMessage:GetType() == Message.Type_Reply or mMessage:GetType() == Message.Type_Error) then
+    self.tOutGoingRequests[mMessage:GetSequence()] = nil
+  end
+end
+
+function Communicator:SendMessage(mMessage, fCallback)
+  if(mMessage:GetDestination() == self:GetOriginName()) then
+    return
+  end
+  
+  if(mMessage:GetType() ~= Message.Type_Error and mMessage:GetType() ~= Message.Type_Reply) then
+    self.nSequenceCounter = tonumber(self.nSequenceCounter or 0) + 1
+    mMessage:SetSequence(self.nSequenceCounter)
+  end
+  
+  self.tOutgoingRequests[mMessage:GetSequence()] = { message = mMessage, handler = fCallback, time = os.time() }
+  self.qPendingMessages:Push(mMessage)
+  
+  if(not self.bQueueProcessRunning) then
+    self.bQueueProcessRunning = true
+    Apollo.CreateTime("Communicator_Queue", 0.5, true)
+  end
+end
+
+function Communicator:ChannelForPlayer(strPlayerName)
+  local channel = self.chnCommunicator
+  
+  if(channel == nil) then
+    channel = ICComLib.JoinChannel("Communicator", ICComLib.CodeEnumICCommChannelType.Global)
+    channel:SetJoinResultFunction("OnSyncChannelJoined", self)
+    channel:IsReady()
+    channel:SetReceivedMessageFunction("OnSyncMessageReceived", self)
+  end
+  
+  return channel
+end
+    
+function Communicator:OnTimerQueueShutdown()
+  Apollo.StopTimer("Communicator_Queue")
+  self.bQueueProcessRunning = false
+end
+
+function Communicator:ProcessMessageQueue()
+  if(self.qPendingMessage:GetSize() == 0) then
+    Apollo.CreateTimer("Communicator_QueueShutDown", 0.1, false)
+    return
+  end
+  
+  local mMessage = self.qPendingMessages:Pop()
+  local channel = self:ChannelForPlayer(mMessage:GetDestination())
+  
+  if(channel.SendPrivateMessage ~= nil) then
+    channel:SendPrivateMessage(mMessage:GetDestination(), mMessage:Serialize())
+  else
+    channel:SendMessage(mMessage:Serialize())
+  end
+  
+  if(not self.bTimeoutRunning) then
+    self.bTimeoutRunning = true
+    Apollo.CreateTime("Communicator_Timeout", 15, true)
+  end
+end
+    
+function Communicator:OnTimerTimeoutShutdown()
+  Apollo:StopTimer("Communicator_Timeout")
+  self.bTimeoutRunning = false
+end
+
+function Communicator:OnTimerTimeout()
+  local nNow = os.time()
+  local nOutgoingCount = 0
+  
+  for nSequence, tData in pairs(self.tOutgoingRequests) do
+    if(nNow - tData.time > Communicator.TTL_Packet) then
+      local mError = self:Reply(tData.message, { error = Communicator.Error_RequestTimedOut, destination = tData.message:GetDestination(), localError = true })
+      mError:SetType(Message.Type_Error)
+      self:ProcessMessage(mError)
+      self.tOutgoingRequests[nSequence] = nil
+    else
+      nOutgoingCount = nOutgoingCount + 1
+    end
+  end
+  
+  for strCommandId, nLastTime in pairs(self.tFloodPrevent) do
+    if((nNow - nLastTime) > Communicator.TTL_Flood) then
+      self.tFloodPrevent[strCommandId] = nil
+    end
+  end
+  
+  for strPlayerName, tChannelRecord in pairs(self.tCachedPlayerChannels) do
+    if((nNow - tChannelRecord.time or 0) > Communicator.TTL_Channel) then
+      self.tCachedPlayerChannels[strPlayerName] = nil
+    end
+  end
+  
+  if(nOutgoingCount == 0) then
+    Apollo.CreateTime("Communicator_TimeoutShutdown", 0.1, false)
+  end
+end
+
+function Communicator:OnTimerCleanupCache()
+  local nNow = os.time()
+  
+  for strPlayerName, tRecord in pairs(self.tCachedPlayerData) do
+    for strParam, tTrait in pairs(tRecord) do
+      if(nNow - tTrait.time > Communicator.TTL_CacheDie) then
+        tRecord[strParam] = nil
+      end
+    end
+    
+    local nCount = 0
+    
+    for strParam, tTrait in pairs(tRecord) do
+      nCount = nCount + 1
+    end
+    
+    if(nCount == 0) then
+      self.tCachedPlayerData[strPlayerName] = nil
+    end
+    
+    -- Can't the above loop + if-statement not be shortened into:
+    --
+    -- if(#tRecord == 0) then
+    --  self.tCachedPlayerData[strPlayerName] = nil
+    -- end
+  end
+end
+
+function Communicator:Stats()
+  local nLocalTraits = 0
+  local nPlayers = 0
+  local nCachedTraits = 0
+  
+  for strTrait, tRecord in pairs(self.tLocalTraits) do
+    nLocalTraits = nLocalTraits + 1
+  end
+  
+  for strPlayer, tRecord in pairs(self.tCachedPlayerData) do
+    nPlayers = nPlayers + 1
+    
+    for strParam, tValue in pairs(tRecord) do
+      nCachedTraits = nCachedTraits + 1
+    end
+  end
+  
+  return nLocalTraits, nCachedTraits, nPlayers
+end
+
+function Communicator:GetCachedPlayerList()
+  local tCachedPlayers = {}
+ 
+  for strPlayerName, _ in pairs(self.tCachedPlayerData) do
+    table.insert(tCachedPlayers, strPlayerName)
+  end
+  
+  return tCachedPlayers
+end
+
+function Communicator:ClearCachedPlayerList()
+  for strPlayerName, _ in pairs(self.tCachedPlayerData) do
+    if(strPlayerName ~= self:GetOriginName()) then
+      self.tCachedPlayerData[strPlayerName] = nil
+    end
+  end
+end
+
+function Communicator:CacheAsTable()
+  return { locaData = self.tLocalTraits, cachedData = self.tCachedPlayerData }
+end
+
+function Communicator:LoadFromTable(tData)
+  self.tLocalTraits = tData.localData or {}
+  self.tCachedPlayerData = tData.cachedData or {}
+  self:CleanupCache()
+end
+
+function Communicator:RegisterAddonProtocolHandler(strAddonProtocol, fHandler)
+  local aHandlers = self.tApiProtocolHandlers[strAddonProtocol] or {}
+  table.insert(aHandlers, fHandler)
+  self.tApiProtocolHandlers[strAddonProtocol] = aHandlers
+end
+
+---------------------------------------------------------------------------------------------------
+-- Package Registration
+---------------------------------------------------------------------------------------------------
 Apollo.RegisterPackage(Communicator:new(), MAJOR, MINOR, {"Lib:dkJSON-2.5"})
