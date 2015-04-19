@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Addon Author="" APIVersion="10" Name="CommunicatorTest" Description="">
+    <Script Name="CommunicatorTest.lua"/>
+    <Form Name="CommunicatorTest.xml"/>
+    <Script Name="LibJSON-2.5.lua"/>
+    <Script Name="communicator.lua"/>
+</Addon>
