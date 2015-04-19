@@ -740,7 +740,7 @@ function Communicator:SendMessage(mMessage, fCallback)
   
   if(not self.bQueueProcessRunning) then
     self.bQueueProcessRunning = true
-    Apollo.CreateTime("Communicator_Queue", 0.5, true)
+    Apollo.CreateTimer("Communicator_Queue", 0.5, true)
   end
 end
 
