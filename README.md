@@ -51,7 +51,7 @@ By setting the traits, others will automatically be able to get these values by 
 		[GameLib.CodeEnumRace.Human] 	= Apollo.GetString("RaceHuman"),
 		[GameLib.CodeEnumRace.Granok] 	= Apollo.GetString("RaceGranok"),
 		[GameLib.CodeEnumRace.Aurin] 	= Apollo.GetString("RaceAurin"),
-		[GameLib.CodeEnumRace.Draken] = Apollo.GetString("RaceDraken"),
+		[GameLib.CodeEnumRace.Draken] 	= Apollo.GetString("RaceDraken"),
 		[GameLib.CodeEnumRace.Mechari] 	= Apollo.GetString("RaceMechari"),
 		[GameLib.CodeEnumRace.Chua] 	= Apollo.GetString("RaceChua"),
 		[GameLib.CodeEnumRace.Mordesh] 	= Apollo.GetString("CRB_Mordesh"),
