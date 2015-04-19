@@ -65,8 +65,8 @@ function Message:new()
   self.__index = self
   
   self:SetProtocolVersion(Message.ProtocolVersion)
-  self:SetMessageType(Message.Type_Request)
-  self:SetOrigin(self:GetOriginName())
+  self:SetType(Message.Type_Request)
+  self:SetOrigin(Communicator:GetOriginName())
   
   return o
 end
@@ -571,7 +571,7 @@ end
 
 function Communicator:GetAllTraits(strTarget)
   local tPlayerTraits = self.tCachedPlayerData[strTarget] or {}
-  self:Log(Communicator.Debug_Access, string.format("Fetching %s's full trait set (version: %s)", strTarget, strVersion))
+  self:Log(Communicator.Debug_Access, string.format("Fetching %s's full trait set (version: %s)", strTarget, Communicator.Version))
   
   if(self:TimeSinceLastAddonProtocolCommand(strTarget, nil, "getall") > Communicator.TTL_GetAll) then
     local mMessage = Message:new()
