@@ -37,7 +37,7 @@ This can be done using the following lines:
 		Apollo.RegisterSlashCommand("commtest", "OnCommunicatorTestOn", self)
 		
 		-- Do additional Addon initialization here
-		Communicator = Comm = Apollo.GetPackage("Communicator-1.0").tPackage	  
+		Communicator = Apollo.GetPackage("Communicator-1.0").tPackage	  
 	end
 	
 ## Setting traits
