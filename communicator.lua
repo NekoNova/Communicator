@@ -582,7 +582,7 @@ function Communicator:GetAllTraits(strTarget)
     self:MarkAddonProtocolCommand(strTarget, nil, "getall")
   end
   
-  local result = {}
+  local tResult = {}
   
   for key, data in pairs(tPlayerTraits) do
     if(key:sub(1,2) ~= "__") then
