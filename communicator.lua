@@ -488,8 +488,6 @@ function Communicator:FetchTrait(strTarget, strTraitName)
 end
 
 function Communicator:CacheTrait(strTarget, strTrait, data, nRevision)
-  if(strTarget == nil) then return end
-  
   if(strTarget == nil or strTarget == self:GetOriginName()) then
     self.tLocalTraits[strTrait] = { data = data, revision = nRevision }
     self:Log(Communicator.Debug_Access, string.format("Caching own %s: (%d) %s", strTrait, nRevision or 0, tostring(data)))
