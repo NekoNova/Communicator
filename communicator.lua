@@ -257,7 +257,7 @@ function Communicator:OnLoad()
   self.tCachedPlayerChannels = {}
   self.bTimeoutRunnin = false
   self.nSequenceCounter = 0
-  self.nDebugLevel = 0
+  self.nDebugLevel = 3
   self.qPendingMessages = Queue:new()
   self.kstrRPStateStrings = {
     "In-Character, Not Available for RP",
@@ -647,10 +647,13 @@ function Communicator:ProcessMessage(mMessage)
   end
   
   if(mMessage:GetAddonProtocol() == nil) then
+	Print("Message without protocol")
     local eType = mMessage:GetType()
     local tPayload = mMessage:GetPayload() or {}
   
+	-- This is something for Communicator itself.
     if(eType == Message.Type_Request) then
+		Print("Processing a request")
       if(mMessage:GetCommand() == "get") then
         local aReplies = {}
         
@@ -735,7 +738,6 @@ function Communicator:SendMessage(mMessage, fCallback)
   
   self.tOutgoingRequests[mMessage:GetSequence()] = { message = mMessage, handler = fCallback, time = os.time() }
   self.qPendingMessages:Push(mMessage)
-  
   if(not self.bQueueProcessRunning) then
     self.bQueueProcessRunning = true
     Apollo.CreateTimer("Communicator_Queue", 0.5, true)
@@ -761,7 +763,7 @@ function Communicator:OnTimerQueueShutdown()
 end
 
 function Communicator:ProcessMessageQueue()
-  if(self.qPendingMessage:GetSize() == 0) then
+  if(self.qPendingMessages:GetSize() == 0) then
     Apollo.CreateTimer("Communicator_QueueShutDown", 0.1, false)
     return
   end

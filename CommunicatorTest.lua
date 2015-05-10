@@ -16,15 +16,19 @@ local Comm
 -- e.g. local kiExampleVariableMax = 999
 
 local karRaceToString = {
-[GameLib.CodeEnumRace.Human] 	= Apollo.GetString("RaceHuman"),
-[GameLib.CodeEnumRace.Granok] 	= Apollo.GetString("RaceGranok"),
-[GameLib.CodeEnumRace.Aurin] 	= Apollo.GetString("RaceAurin"),
-[GameLib.CodeEnumRace.Draken] = Apollo.GetString("RaceDraken"),
-[GameLib.CodeEnumRace.Mechari] 	= Apollo.GetString("RaceMechari"),
-[GameLib.CodeEnumRace.Chua] 	= Apollo.GetString("RaceChua"),
-[GameLib.CodeEnumRace.Mordesh] 	= Apollo.GetString("CRB_Mordesh"),
+	[GameLib.CodeEnumRace.Human] 	= Apollo.GetString("RaceHuman"),
+	[GameLib.CodeEnumRace.Granok] 	= Apollo.GetString("RaceGranok"),
+	[GameLib.CodeEnumRace.Aurin] 	= Apollo.GetString("RaceAurin"),
+	[GameLib.CodeEnumRace.Draken] 	= Apollo.GetString("RaceDraken"),
+	[GameLib.CodeEnumRace.Mechari] 	= Apollo.GetString("RaceMechari"),
+	[GameLib.CodeEnumRace.Chua] 	= Apollo.GetString("RaceChua"),
+	[GameLib.CodeEnumRace.Mordesh] 	= Apollo.GetString("CRB_Mordesh")
 }
-local karGenderToString = { [0] = Apollo.GetString("CRB_Male"), [1] = Apollo.GetString("CRB_Female"), [2] = Apollo.GetString("CRB_UnknownType"),}
+local karGenderToString = { 
+	[Unit.CodeEnumGender.Male] = Apollo.GetString("CRB_Male"), 
+	[Unit.CodeEnumGender.Female] = Apollo.GetString("CRB_Female"), 
+	[Unit.CodeEnumGender.Uni] = Apollo.GetString("CRB_UnknownType")
+}
  
 -----------------------------------------------------------------------------------------------
 -- Initialization
@@ -45,7 +49,6 @@ function CommunicatorTest:Init()
 	local tDependencies = {
 		"Lib:dkJSON-2.5",
 		"Communicator-1.0",
-		-- "UnitOrPackageName",
 	}
     Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 end
@@ -96,28 +99,33 @@ function CommunicatorTest:OnCommunicatorTestOn()
 	Comm:SetLocalTrait("fullname", GameLib.GetPlayerUnit():GetName())
 	Comm:SetLocalTrait("race", karRaceToString[GameLib.GetPlayerUnit():GetRaceId()])
 	Comm:SetLocalTrait("gender",karGenderToString[GameLib.GetPlayerUnit():GetGender()])
+	Comm:SetLocalTrait("random","my name is "..GameLib.GetPlayerUnit():GetName())
 	self.wndMain:Invoke() -- show the window
 end
 
 function CommunicatorTest:UpdateCharacterSheet()
 	local player = self.wndMain:GetData()
 	
-	local rpFullname, rpRace, rpGender
+	local rpFullname, rpRace, rpGender, rpRandom
 	local xmlCS = XmlDoc.new()
 	
-	rpFullname = Comm:GetTrait(player,"fullname") or player
+	rpFullname = Comm:GetTrait(player,"fullname")
 	rpRace = Comm:GetTrait(player, "race")
 	rpGender = Comm:GetTrait(player, "gender")
+	rpRandom = Comm:GetTrait(player, "random")
 	
 	local strLabelColor = "FF009999"
 	local strEntryColor = "FF99FFFF"
+	
 	xmlCS:AddLine("Name: ", strLabelColor,"CRB_InterfaceMedium")
 	xmlCS:AppendText(rpFullname, strEntryColor, "CRB_InterfaceMedium")
 	xmlCS:AddLine("Species: ", strLabelColor, "CRB_InterfaceMedium")
 	xmlCS:AppendText(rpRace, strEntryColor, "CRB_InterfaceMedium")
 	xmlCS:AddLine("Gender: ", strLabelColor, "CRB_InterfaceMedium")
 	xmlCS:AppendText(rpGender, strEntryColor, "CRB_InterfaceMedium")
+	
 	self.wndMain:FindChild("wnd_Display"):SetDoc(xmlCS)
+	self.wndMain:FindChild("input_s_Random"):SetText("my name is "..GameLib.GetPlayerUnit():GetName())
 end
 -----------------------------------------------------------------------------------------------
 -- CommunicatorTestForm Functions
@@ -135,7 +143,28 @@ function CommunicatorTest:OnCancel()
 	self.wndMain:Close() -- hide the window
 end
 
+function CommunicatorTest:btnSaveClick()
+	local xmlCS = XmlDoc.new()
+	local player = GameLib.GetPlayerUnit():GetName()
 
+	rpFullname = Comm:GetTrait(player,"fullname")
+	rpRace = Comm:GetTrait(player, "race")
+	rpGender = Comm:GetTrait(player, "gender")
+	rpRandom = Comm:GetTrait(player, "random")
+	
+	local strLabelColor = "FF009999"
+	local strEntryColor = "FF99FFFF"
+	
+	xmlCS:AddLine("Name: ", strLabelColor,"CRB_InterfaceMedium")
+	xmlCS:AppendText(rpFullname, strEntryColor, "CRB_InterfaceMedium")
+	xmlCS:AddLine("Species: ", strLabelColor, "CRB_InterfaceMedium")
+	xmlCS:AppendText(rpRace, strEntryColor, "CRB_InterfaceMedium")
+	xmlCS:AddLine("Gender: ", strLabelColor, "CRB_InterfaceMedium")
+	xmlCS:AppendText(rpGender, strEntryColor, "CRB_InterfaceMedium")
+	
+	self.wndMain:FindChild("wnd_Display"):SetDoc(xmlCS)
+	self.wndMain:FindChild("input_s_Random"):SetText("my name is "..rpFullname)
+end
 -----------------------------------------------------------------------------------------------
 -- CommunicatorTest Instance
 -----------------------------------------------------------------------------------------------
