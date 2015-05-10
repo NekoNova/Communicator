@@ -78,14 +78,18 @@ function CommunicatorTest:OnDocLoaded()
 	    self.wndMain:Show(false, true)
 
 		-- if the xmlDoc is no longer needed, you should set it to nil
-		-- self.xmlDoc = nil
+		self.xmlDoc = nil
 		
 		-- Register handlers for events, slash commands and timer, etc.
 		-- e.g. Apollo.RegisterEventHandler("KeyDown", "OnKeyDown", self)
 		Apollo.RegisterSlashCommand("commtest", "OnCommunicatorTestOn", self)
+		Apollo.RegisterEventHandler("Communicator_TraitChanged", "OnTraitChanged", self)
+		Apollo.RegisterEventHandler("Communicator_PlayerUpdated", "OnPlayerUpdated", self)
 		-- Do additional Addon initialization here
 		Comm = Apollo.GetPackage("Communicator-1.0").tPackage
 		self.tmrRefreshCharacterSheet = ApolloTimer.Create(3, true, "UpdateCharacterSheet", self)
+		Comm:ClearCachedPlayerList()
+		Comm:SetDebugLevel(1)
 	end
 end
 
@@ -104,9 +108,13 @@ function CommunicatorTest:OnCommunicatorTestOn()
 end
 
 function CommunicatorTest:UpdateCharacterSheet()
-	local player = self.wndMain:GetData()
+	if GameLib.GetTargetUnit() == nil or GameLib.GetTargetUnit() == GameLib.GetPlayerUnit() then return end
 	
+	local player = self.wndMain:GetData()
 	local rpFullname, rpRace, rpGender, rpRandom
+
+	if player == GameLib.GetPlayerUnit():GetName() then return end
+	
 	local xmlCS = XmlDoc.new()
 	
 	rpFullname = Comm:GetTrait(player,"fullname")
@@ -126,6 +134,15 @@ function CommunicatorTest:UpdateCharacterSheet()
 	
 	self.wndMain:FindChild("wnd_Display"):SetDoc(xmlCS)
 	self.wndMain:FindChild("input_s_Random"):SetText("my name is "..GameLib.GetPlayerUnit():GetName())
+end
+
+function CommunicatorTest:OnPlayerUpdated(tData)
+	Print(tData.player.." data updated.")
+end
+
+function CommunicatorTest:OnTraitChanged(tTraitInfo)
+	--tTraitInfo
+	Print(string.format("Player: %s\nTrait: %s\nData: %s\nRevision: %s", tTraitInfo.player, tTraitInfo.trait, tTraitInfo.data, tTraitInfo.revision))
 end
 -----------------------------------------------------------------------------------------------
 -- CommunicatorTestForm Functions
