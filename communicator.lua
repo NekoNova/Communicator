@@ -30,7 +30,7 @@ local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
 -- Splits the given string and returns the values.
 --
 -- str: The string to break up
--- sep: The delimiter, seperating the values.
+-- sep: The delimiter, separating the values.
 local function split(str, sep)
   if sep == nil then sep = "%s" end
   
@@ -321,6 +321,9 @@ function Communicator:OnTimerSetup()
   self.chnCommunicator:SetReceivedMessageFunction("OnSyncMessageReceived", self)
 end
 
+-- Constructs a new Message structure, that is a reply on the provided Message.
+-- The tPayload is set as the payload of the response.
+--
 function Communicator:Reply(mMessage, tPayload)
   local newMessage = Message:new()
   
@@ -336,6 +339,10 @@ function Communicator:Reply(mMessage, tPayload)
   return newMessage
 end
 
+-- Returns the name of the origin, namely our player character.
+-- The function checks if the Player is defined and returns the
+-- name of the Player.
+-- If the Player cannot be loaded, the current value or nil is returned.
 function Communicator:GetOriginName()
   local myUnit = GameLib.GetPlayerUnit()
   
@@ -346,6 +353,8 @@ function Communicator:GetOriginName()
   return self.strPlayerName
 end
 
+-- Sets the debug level for Communicator, controlling the
+-- output level of the Library.
 function Communicator:SetDebugLevel(nDebugLevel)
   self.nDebugLevel = nDebugLevel
 end
@@ -369,6 +378,9 @@ function Communicator:SetBitFlag(x, p, b)
   end
 end
 
+-- Writes the provided log message into the chat, using a controlled structure.
+-- The provided level is used to check whether we're supposed to actually write the 
+-- log message.
 function Communicator:Log(nLevel, strLog)
   if(nLevel > self.nDebugLevel) then return end
   Print("Communicator: " .. strLog)
@@ -396,6 +408,10 @@ function Communicator:TruncateString(strText, nLength)
   return strResult
 end
 
+-- Returns the provided trait of the specified target.
+-- If the target is not yet stored in the Cache, we fetch it and return it
+-- when it becomes avaialble.
+-- If the call fails, nil is returned instead.
 function Communicator:GetTrait(strTarget, strTrait)
   local result = nil
   
@@ -440,42 +456,58 @@ function Communicator:SetRPFlag(flag, bSet)
   self:SetLocalTrait("rpflag", nState)
 end
 
+-- This function is called on a regular basis and processes the messages currently stored in
+-- the TraitQueue.
 function Communicator:ProcessTraitQueue()
+  -- Loop over every message in the Queue.
   for strTarget, aRequests in pairs(self.tPendngPlayerTraitRequests) do
-    self:Log(Communicator.Debug_Comm, "Sending: " .. table.getn(aRequests) .. " qeued trait requests to " .. strTarget)
+    self:Log(Communicator.Debug_Comm, "Sending: " .. table.getn(aRequests) .. " queued trait requests to " .. strTarget)
     
     local mMessage = Message:new()
     
+    -- Construct the message using the information in the Queue.
     mMessage:SetDestination(strTarget)
     mMessage:SetCommand("get")
     mMessage:SetPayload(aRequests)
     
+    -- Send the message to the target, and clear it from the Queue.
     self:SendMessage(mMessage)
     self.tPendingPlayerTraitRequests[strTarget] = nil
   end
 end
 
+-- Fetches the provided trait from the specified target.
+-- The information is read from the local cache, but when the cache does not contain any
+-- information, a request is made to the target to provide the information.
 function Communicator:FetchTrait(strTarget, strTraitName)
+  -- If no target is provided, or we're fetching our own traits, then check
+  -- the localTraits cache for the information and return it when avaialble.
   if (strTarget == nil or strTarget == self:GetOriginName()) then
     local tTrait = self.tLocalTraits[strTraitName] or {}
     self:Log(Communicator.Debug_Access, string.format("Fetching own %s: (%d) %s", strTraitName, tTrait.revision or 0, tostring(tTrait.data)))
     return tTrait.data, tTrait.revision
   else
+    -- Check the local cached player data for the information
     local tPlayerTraits = self.tCachedPlayerData[strTarget] or {}
     local tTrait = tPlayerTraits[strTraitName] or {}
+    local nTTL = Communicator.TTL_Trait
     
     self:Log(Communicator.Debug_Access, string.format("Fetching %s's %s: (%d) %s", strTarget, strTraitName, tTrait.revision or 0, tostring(tTrait.data)))
     
-    local nTTL = Communicator.TTL_Trait
-    
+    -- Check if the TTL is set correctly, and do so if not.    
     if((tTrait.revision or 0) == 0) then nTTL = 10 end
-    if(tTrai == nil or (os.time() - (tTRait.time or 0)) > nTTL) then
+    
+    -- If the trait could not be found, or it has exceeded it's TTL, then
+    -- prepare to request the information again from the target.
+    -- We do this by setting the query in the request queue and fire a timer to
+    -- process it in the background.
+    if(tTrait == nil or (os.time() - (tTrait.time or 0)) > nTTL) then
       tTrait.time = os.time()
       tPlayerTraits[strTraitName] = tTrait
       self.tCachedPlayerData[strTarget] = tPlayerTraits
       
       local tPendingPlayerQuery = self.tPendingPlayerTraitRequests[strTarget] or {}
-      local tRequest = { trait = strTraitName, revision = tTraitRevision or 0 }
+      local tRequest = { trait = strTraitName, revision = tTrait.revision or 0 }
       
       table.insert(tPendingPlayerQuery, tRequest)
       
@@ -487,6 +519,8 @@ function Communicator:FetchTrait(strTarget, strTraitName)
   end
 end
 
+-- Caches the provided trait, with it's value and revision in the cache, using the name of
+-- the target as identifier.
 function Communicator:CacheTrait(strTarget, strTrait, data, nRevision)
   if(strTarget == nil or strTarget == self:GetOriginName()) then
     self.tLocalTraits[strTrait] = { data = data, revision = nRevision }
@@ -634,9 +668,11 @@ function Communicator:OnSyncMessageReceived(channel, strMessage, idMessage)
   end
 end
 
+-- Processes the provided message, parsing the contents and taking the required
+-- action based on the data stored inside.
 function Communicator:ProcessMessage(mMessage)
-  -- Is this ever called?
-  if(eType == Message.Type_Error) then
+  -- Check if we're dealing with an error message.
+  if(mMessage:GetType() == Message.Type_Error) then
     local tData = self.tOutgoingRequests[mMessage:GetSequence()] or {}
     
     if(tData.handler) then
@@ -646,14 +682,14 @@ function Communicator:ProcessMessage(mMessage)
     end
   end
   
+  -- If no AddonProtocol has been defined for the message, then look at the data
+  -- that is beeing provided and try to parse it.
   if(mMessage:GetAddonProtocol() == nil) then
-	Print("Message without protocol")
     local eType = mMessage:GetType()
     local tPayload = mMessage:GetPayload() or {}
   
-	-- This is something for Communicator itself.
+    -- This is something for Communicator itself.
     if(eType == Message.Type_Request) then
-		Print("Processing a request")
       if(mMessage:GetCommand() == "get") then
         local aReplies = {}
         
@@ -661,7 +697,7 @@ function Communicator:ProcessMessage(mMessage)
           local data, revision = self:FetchTrait(nil, tTrait.trait or "")
           
           if(data ~= nil) then
-            local tResponse = { trait = tTait.trait, revision = revision }
+            local tResponse = { trait = tTrait.trait, revision = revision }
             
             if(tPayload.revision == 0 or revision ~= tPayload.revision) then
               tResponse.data = data
@@ -673,7 +709,7 @@ function Communicator:ProcessMessage(mMessage)
           end
         end
         
-        local mReply = Self:Reply(mMessage, aReplies)
+        local mReply = self:Reply(mMessage, aReplies)
         self:SendMessage(mReply)
       elseif(mMessage:GetCommand() == "version") then
         local aProtocols = {}
@@ -688,7 +724,7 @@ function Communicator:ProcessMessage(mMessage)
         local mReply = self:Reply(mMessage, self.tLocalTraits)
         self:SendMessage(mReply)
       else
-        local mReply = self:Reply(packet, { error = self.Error_UnimplementedCommand })
+        local mReply = self:Reply(mMessage, { error = self.Error_UnimplementedCommand })
         mReply:SetType(Message.Type_Error)
         self:SendMessage(mReply)
       end
