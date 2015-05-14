@@ -4,7 +4,8 @@
 -----------------------------------------------------------------------------------------------
  
 require "Window"
- require "ICCommLib"
+require "ICCommLib"
+require "ICComm"
 -----------------------------------------------------------------------------------------------
 -- CommunicatorTest Module Definition
 -----------------------------------------------------------------------------------------------
@@ -37,9 +38,9 @@ function CommunicatorTest:new(o)
     o = o or {}
     setmetatable(o, self)
     self.__index = self 
-
+		
     -- initialize variables here
-
+	
     return o
 end
 
@@ -83,13 +84,13 @@ function CommunicatorTest:OnDocLoaded()
 		-- Register handlers for events, slash commands and timer, etc.
 		-- e.g. Apollo.RegisterEventHandler("KeyDown", "OnKeyDown", self)
 		Apollo.RegisterSlashCommand("commtest", "OnCommunicatorTestOn", self)
-		Apollo.RegisterEventHandler("Communicator_TraitChanged", "OnTraitChanged", self)
-		Apollo.RegisterEventHandler("Communicator_PlayerUpdated", "OnPlayerUpdated", self)
+		--Apollo.RegisterEventHandler("Communicator_TraitChanged", "OnTraitChanged", self)
+		--Apollo.RegisterEventHandler("Communicator_PlayerUpdated", "OnPlayerUpdated", self)
 		-- Do additional Addon initialization here
 		Comm = Apollo.GetPackage("Communicator-1.0").tPackage
 		self.tmrRefreshCharacterSheet = ApolloTimer.Create(3, true, "UpdateCharacterSheet", self)
 		Comm:ClearCachedPlayerList()
-		Comm:SetDebugLevel(1)
+		Comm:SetDebugLevel(3)
 	end
 end
 
@@ -149,6 +150,7 @@ end
 -----------------------------------------------------------------------------------------------
 -- when the OK button is clicked
 function CommunicatorTest:OnOK()
+	if(GameLib.GetTargetUnit() == nil) then return end
 	local strCharacter = GameLib.GetTargetUnit():GetName()
 	if(strCharacter == nil or strCharacter == "") then return end
 	Comm:GetAllTraits(strCharacter)

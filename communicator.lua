@@ -257,7 +257,7 @@ function Communicator:OnLoad()
   self.tCachedPlayerChannels = {}
   self.bTimeoutRunnin = false
   self.nSequenceCounter = 0
-  self.nDebugLevel = 3
+  self.nDebugLevel = 0
   self.qPendingMessages = Queue:new()
   self.kstrRPStateStrings = {
     "In-Character, Not Available for RP",
@@ -460,7 +460,7 @@ end
 -- the TraitQueue.
 function Communicator:ProcessTraitQueue()
   -- Loop over every message in the Queue.
-  for strTarget, aRequests in pairs(self.tPendngPlayerTraitRequests) do
+  for strTarget, aRequests in pairs(self.tPendingPlayerTraitRequests) do
     self:Log(Communicator.Debug_Comm, "Sending: " .. table.getn(aRequests) .. " queued trait requests to " .. strTarget)
     
     local mMessage = Message:new()
@@ -509,6 +509,7 @@ function Communicator:FetchTrait(strTarget, strTraitName)
       local tPendingPlayerQuery = self.tPendingPlayerTraitRequests[strTarget] or {}
       local tRequest = { trait = strTraitName, revision = tTrait.revision or 0 }
       
+	  self:Log(Communicator.Debug_Access, string.format("Building up query to retrieve %s's %s:", strTarget, strTraitName))
       table.insert(tPendingPlayerQuery, tRequest)
       
       self.tPendingPlayerTraitRequests[strTarget] = tPendingPlayerQuery
@@ -671,6 +672,7 @@ end
 -- Processes the provided message, parsing the contents and taking the required
 -- action based on the data stored inside.
 function Communicator:ProcessMessage(mMessage)
+  self:Log(Communicator.Debug_Comm, "Processing Message")
   -- Check if we're dealing with an error message.
   if(mMessage:GetType() == Message.Type_Error) then
     local tData = self.tOutgoingRequests[mMessage:GetSequence()] or {}
