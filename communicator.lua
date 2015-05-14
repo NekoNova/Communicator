@@ -511,7 +511,6 @@ function Communicator:FetchTrait(strTarget, strTraitName)
       
 	  self:Log(Communicator.Debug_Access, string.format("Building up query to retrieve %s's %s:", strTarget, strTraitName))
       table.insert(tPendingPlayerQuery, tRequest)
-      
       self.tPendingPlayerTraitRequests[strTarget] = tPendingPlayerQuery
       Apollo.CreateTimer("Communicator_TraitQueue", 1, false)
     end
@@ -782,7 +781,7 @@ function Communicator:SendMessage(mMessage, fCallback)
   end
 end
 
-function Communicator:ChannelForPlayer(strPlayerName)
+function Communicator:ChannelForPlayer()
   local channel = self.chnCommunicator
   
   if(channel == nil) then
@@ -790,6 +789,7 @@ function Communicator:ChannelForPlayer(strPlayerName)
     channel:SetJoinResultFunction("OnSyncChannelJoined", self)
     channel:IsReady()
     channel:SetReceivedMessageFunction("OnSyncMessageReceived", self)
+    self.chnCommunicator = channel
   end
   
   return channel
@@ -807,7 +807,7 @@ function Communicator:ProcessMessageQueue()
   end
   
   local mMessage = self.qPendingMessages:Pop()
-  local channel = self:ChannelForPlayer(mMessage:GetDestination())
+  local channel = self:ChannelForPlayer()
   
   if(channel.SendPrivateMessage ~= nil) then
     channel:SendPrivateMessage(mMessage:GetDestination(), mMessage:Serialize())
