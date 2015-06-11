@@ -87,7 +87,7 @@ function CommunicatorTest:OnDocLoaded()
 		--Apollo.RegisterEventHandler("Communicator_TraitChanged", "OnTraitChanged", self)
 		--Apollo.RegisterEventHandler("Communicator_PlayerUpdated", "OnPlayerUpdated", self)
 		-- Do additional Addon initialization here
-		Comm = Apollo.GetPackage("Communicator-1.0").tPackage
+		Communicator = Apollo.GetAddon("Communicator")
 		self.tmrRefreshCharacterSheet = ApolloTimer.Create(3, true, "UpdateCharacterSheet", self)
 		Comm:ClearCachedPlayerList()
 		Comm:SetDebugLevel(3)
