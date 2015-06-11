@@ -326,7 +326,7 @@ function Communicator:OnTimerSetup()
   end
   
   -- Configure the Channel according new ICCommLib standards
-  self.chnCommunicator = ICComLib.JoinChannel("Communicator", ICComLib.CodeEnumICCommChannelType.Global)
+  self.chnCommunicator = ICCommLib.JoinChannel("Communicator", ICCommLib.CodeEnumICCommChannelType.Global)
   self.chnCommunicator:SetJoinResultFunction("OnSyncChannelJoined", self)
   self.chnCommunicator:IsReady()
   self.chnCommunicator:SetReceivedMessageFunction("OnSyncMessageReceived", self)
@@ -796,7 +796,7 @@ function Communicator:ChannelForPlayer()
   local channel = self.chnCommunicator
   
   if(channel == nil) then
-    channel = ICComLib.JoinChannel("Communicator", ICComLib.CodeEnumICCommChannelType.Global)
+    channel = ICCommLib.JoinChannel("Communicator", ICCommLib.CodeEnumICCommChannelType.Global)
     channel:SetJoinResultFunction("OnSyncChannelJoined", self)
     channel:IsReady()
     channel:SetReceivedMessageFunction("OnSyncMessageReceived", self)
@@ -951,5 +951,5 @@ function Communicator:RegisterAddonProtocolHandler(strAddonProtocol, fHandler)
   self.tApiProtocolHandlers[strAddonProtocol] = aHandlers
 end
 
-local CommunicatorInst = CommunicatorTest:new()
+local CommunicatorInst = Communicator:new()
 CommunicatorInst:Init()
