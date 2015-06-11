@@ -9,19 +9,30 @@
 local Communicator = {}
 local Message = {}
 
+require "Window"
 require "ICCommLib"
-
-local MAJOR, MINOR = "Communicator-1.0", 1
-
--- Get a reference to the package information if any
-local APkg = Apollo.GetPackage(MAJOR)
-
--- If there was an older version loaded we need to see if this is newer
-if APkg and (APkg.nVersion or 0) >= MINOR then
-	return -- no upgrade needed
-end
+require "ICComm"
 
 local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
+
+function Communicator:new(o)
+    o = o or {}
+    setmetatable(o, self)
+    self.__index = self 
+		
+    -- initialize variables here
+	
+    return o
+end
+
+function Communicator:Init()
+	local bHasConfigureFunction = false
+	local strConfigureButtonText = ""
+	local tDependencies = {
+		"Lib:dkJSON-2.5",
+	}
+    Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
+end
 
 ---------------------------------------------------------------------------------------------------
 -- Local Functions
@@ -940,7 +951,5 @@ function Communicator:RegisterAddonProtocolHandler(strAddonProtocol, fHandler)
   self.tApiProtocolHandlers[strAddonProtocol] = aHandlers
 end
 
----------------------------------------------------------------------------------------------------
--- Package Registration
----------------------------------------------------------------------------------------------------
-Apollo.RegisterPackage(Communicator:new(), MAJOR, MINOR, {"Lib:dkJSON-2.5"})
+local CommunicatorInst = CommunicatorTest:new()
+CommunicatorInst:Init()

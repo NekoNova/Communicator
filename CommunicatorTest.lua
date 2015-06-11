@@ -10,7 +10,7 @@ require "ICComm"
 -- CommunicatorTest Module Definition
 -----------------------------------------------------------------------------------------------
 local CommunicatorTest = {} 
-local Comm
+local Communicator
 -----------------------------------------------------------------------------------------------
 -- Constants
 -----------------------------------------------------------------------------------------------
@@ -49,7 +49,7 @@ function CommunicatorTest:Init()
 	local strConfigureButtonText = ""
 	local tDependencies = {
 		"Lib:dkJSON-2.5",
-		"Communicator-1.0",
+		"Communicator",
 	}
     Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 end
