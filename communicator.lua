@@ -8,6 +8,7 @@
 ---------------------------------------------------------------------------------------------------
 local Communicator = {}
 local Message = {}
+local Queue = {}
 
 require "Window"
 require "ICCommLib"
@@ -54,6 +55,41 @@ local function split(str, sep)
   end
   
   return unpack(result)
+end
+
+
+---------------------------------------------------------------------------------------------------
+-- Queue Module Initialization
+---------------------------------------------------------------------------------------------------
+function Queue:new()
+	local o = {first = 0, last = -1}
+	setmetatable(o, self)
+	self.__index = self
+	return o
+end
+
+---------------------------------------------------------------------------------------------------
+-- Queue Push and Pop
+---------------------------------------------------------------------------------------------------
+
+function Queue:Push (value)
+	local last = self.last + 1
+	self.last = last
+	self[last] = value
+end
+    
+function Queue:Pop()
+	local first = self.first
+	if first > self.last then error("queue is empty") end
+	local value = self[first]
+	self[first] = nil        -- to allow garbage collection
+	self.first = first + 1
+	return value
+end
+
+function Queue:GetSize()
+	local length = self.last - self.first + 1
+	return length
 end
 
 ---------------------------------------------------------------------------------------------------
@@ -143,9 +179,9 @@ end
 
 function Message:SetOrigin(strOrigin)
   if(type(strOrigin) ~= "string") then
+	Print(tostring(strOrigin))
     error("Communicator: Attempt to set non-string origin: " .. tostring(strOrigin))
   end
-  
   self.strOrigin = strOrigin
 end
 
@@ -191,20 +227,24 @@ end
 
 function Message:Serialize()
 	local message ={
-		version = self:GetProtocolVersion(),
-		command = self:GetCommand(),
-		type = self:GetType(),
+		version = self:GetProtocolVersion(),--
+		command = self:GetCommand(),--
+		type = self:GetType(),--
 		tPayload = self:GetPayload(),
-		sequence = self:GetSequence(),
-		origin = self:GetOrigin(),
-		destination = self:GetDestination()
+		sequence = self:GetSequence(),--
+		origin = self:GetOrigin(),--
+		destination = self:GetDestination(),--
 	}
-	return JSON:encode(message)   
+	--local xmlMessage = XmlDoc:CreateFromTable(message)
+	--Print(xmlMessage)
+	--return xmlMessage
+	return JSON.encode(message, { indent = false })
+	
 end
 
 function Message:Deserialize(strPacket)
   if(strPacket == nil) then return end
-  local message = JSON:decode(strPacket)
+  local message = JSON.decode(strPacket)
 
   -- Set out properties
   self:SetProtocolVersion(message.version)
@@ -261,7 +301,7 @@ end
 function Communicator:OnLoad()
   self.tApiProtocolHandlers = {}
   self.tLocalTraits = {}
-  self.tOutgoingRequests = {}
+  self.tOutGoingRequests = {}
   self.tFloodPrevent = {}
   self.tCachedPlayerData = {}
   self.tPendingPlayerTraitRequests = {}
@@ -304,19 +344,13 @@ function Communicator:OnSave(eLevel)
   end
 end
 
-function Communicator:OnRestore(eLevel, tDate)
-  if (tData ~= nil and eLevel == GameLib.CodeEnumAddonSaveLevel.Character) then
-    local tLocal = tData.localData
-    local tCache = tData.cachedData
-    
-    self.tLocalTraits = tLocal or {}
-    
-    if (tCache ~= nil) then
-      self.tCachedPlayerData = tData.cachedData or {}
-    end
-  elseif (tData ~= nil and eLevel == GameLib.CodeEnumAddonSaveLevel.Realm) then
-    self.tCachedPlayerData = tData.cachedData or {}
-  end
+function Communicator:OnRestore(eLevel, tData)
+	if (tData ~= nil and eLevel == GameLib.CodeEnumAddonSaveLevel.Character) then
+		local tLocal = tData.localData
+		self.tLocalTraits = tLocal or {}
+	elseif (tData ~= nil and eLevel == GameLib.CodeEnumAddonSaveLevel.Realm) then
+		self.tCachedPlayerData = tData.cachedData or {}	
+	end
 end
 
 function Communicator:OnTimerSetup()
@@ -594,7 +628,7 @@ function Communicator:QueryVersion(strTarget)
     mMessage:SetDestination(strTarget)
     mMessage:SetType(Message.Type_Request)
     mMessage:SetCommand("version")
-    
+    mMessage:SetPayload({""})
     self:SendMessage(mMessage)
   end
   
@@ -685,11 +719,11 @@ function Communicator:ProcessMessage(mMessage)
   self:Log(Communicator.Debug_Comm, "Processing Message")
   -- Check if we're dealing with an error message.
   if(mMessage:GetType() == Message.Type_Error) then
-    local tData = self.tOutgoingRequests[mMessage:GetSequence()] or {}
+    local tData = self.tOutGoingRequests[mMessage:GetSequence()] or {}
     
     if(tData.handler) then
       tData.handler(mMessage)
-      self.tOutgoingRequests[mMessage:GetSequence()] = nil
+      self.tOutGoingRequests[mMessage:GetSequence()] = nil
       return
     end
   end
@@ -784,7 +818,7 @@ function Communicator:SendMessage(mMessage, fCallback)
     mMessage:SetSequence(self.nSequenceCounter)
   end
   
-  self.tOutgoingRequests[mMessage:GetSequence()] = { message = mMessage, handler = fCallback, time = os.time() }
+  self.tOutGoingRequests[mMessage:GetSequence()] = { message = mMessage, handler = fCallback, time = os.time() }
   self.qPendingMessages:Push(mMessage)
   if(not self.bQueueProcessRunning) then
     self.bQueueProcessRunning = true
@@ -828,12 +862,12 @@ function Communicator:ProcessMessageQueue()
   
   if(not self.bTimeoutRunning) then
     self.bTimeoutRunning = true
-    Apollo.CreateTime("Communicator_Timeout", 15, true)
+    Apollo.CreateTimer("Communicator_Timeout", 15, true)
   end
 end
     
 function Communicator:OnTimerTimeoutShutdown()
-  Apollo:StopTimer("Communicator_Timeout")
+  Apollo.StopTimer("Communicator_Timeout")
   self.bTimeoutRunning = false
 end
 
@@ -841,12 +875,12 @@ function Communicator:OnTimerTimeout()
   local nNow = os.time()
   local nOutgoingCount = 0
   
-  for nSequence, tData in pairs(self.tOutgoingRequests) do
+  for nSequence, tData in pairs(self.tOutGoingRequests) do
     if(nNow - tData.time > Communicator.TTL_Packet) then
       local mError = self:Reply(tData.message, { error = Communicator.Error_RequestTimedOut, destination = tData.message:GetDestination(), localError = true })
       mError:SetType(Message.Type_Error)
       self:ProcessMessage(mError)
-      self.tOutgoingRequests[nSequence] = nil
+      self.tOutGoingRequests[nSequence] = nil
     else
       nOutgoingCount = nOutgoingCount + 1
     end
@@ -865,7 +899,7 @@ function Communicator:OnTimerTimeout()
   end
   
   if(nOutgoingCount == 0) then
-    Apollo.CreateTime("Communicator_TimeoutShutdown", 0.1, false)
+    Apollo.CreateTimer("Communicator_TimeoutShutdown", 0.1, false)
   end
 end
 
