@@ -6,43 +6,55 @@
 -- The Libary can also be used by different Addons if desired to transfer information, this just
 -- requires some modifications to the transfer protocol.
 ---------------------------------------------------------------------------------------------------
-local Communicator = {}
-local Message = {}
-local Queue = {}
-
 require "Window"
 require "ICCommLib"
 require "ICComm"
 
-local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
+---------------------------------------------------------------------------------------------------
+-- Package Configuration
+---------------------------------------------------------------------------------------------------
+local MAJOR, MINOR = "Communicator", 1
+local APkg = Apollo.GetPackage(MAJOR)
 
-function Communicator:new(o)
-    o = o or {}
-    setmetatable(o, self)
-    self.__index = self 
-		
-    -- initialize variables here
-	
-    return o
+if APkg and (APkg.nVersion or 0) >= MINOR then
+  return  -- No upgrade is needed
 end
 
+local Communicator = APkg and APkg.tPackage or {}
+local Message = {}
+local Queue = {}
+local JSON = Apollo.GetPackage("Lib:dkJSON-2.5").tPackage
+
+---------------------------------------------------------------------------------------------------
+-- Constructor
+---------------------------------------------------------------------------------------------------
+function Communicator:new(o)
+  o = o or {}
+  setmetatable(o, self)
+  self.__index = self 
+  
+  -- initialize variables here
+  
+  return o
+end
+
+---------------------------------------------------------------------------------------------------
+-- Init
+---------------------------------------------------------------------------------------------------
 function Communicator:Init()
 	local bHasConfigureFunction = false
 	local strConfigureButtonText = ""
 	local tDependencies = {
 		"Lib:dkJSON-2.5",
 	}
-    Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
+  
+  Apollo.RegisterAddon(self, bHasConfigureFunction, strConfigureButtonText, tDependencies)
 end
-
 ---------------------------------------------------------------------------------------------------
 -- Local Functions
 ---------------------------------------------------------------------------------------------------
 
 -- Splits the given string and returns the values.
---
--- str: The string to break up
--- sep: The delimiter, separating the values.
 local function split(str, sep)
   if sep == nil then sep = "%s" end
   
@@ -57,7 +69,6 @@ local function split(str, sep)
   return unpack(result)
 end
 
-
 ---------------------------------------------------------------------------------------------------
 -- Queue Module Initialization
 ---------------------------------------------------------------------------------------------------
@@ -71,7 +82,6 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Queue Push and Pop
 ---------------------------------------------------------------------------------------------------
-
 function Queue:Push (value)
 	local last = self.last + 1
 	self.last = last
@@ -985,5 +995,11 @@ function Communicator:RegisterAddonProtocolHandler(strAddonProtocol, fHandler)
   self.tApiProtocolHandlers[strAddonProtocol] = aHandlers
 end
 
-local CommunicatorInst = Communicator:new()
-CommunicatorInst:Init()
+---------------------------------------------------------------------------------------------------
+-- Package Registration
+---------------------------------------------------------------------------------------------------
+function Communicator:Initialize()
+  Apollo.RegisterPackage(self, MAJOR, MINOR, { "Lib:dkJSON-2.5" })
+end
+
+Communicator:Initialize()
