@@ -189,9 +189,10 @@ end
 
 function Message:SetOrigin(strOrigin)
   if(type(strOrigin) ~= "string") then
-	Print(tostring(strOrigin))
+    Print(tostring(strOrigin))
     error("Communicator: Attempt to set non-string origin: " .. tostring(strOrigin))
   end
+  
   self.strOrigin = strOrigin
 end
 
