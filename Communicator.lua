@@ -321,8 +321,7 @@ function Communicator:FetchTrait(strTarget, strTraitName)
       table.insert(tPendingPlayerQuery, tRequest)
       
       self.tPendingPlayerTraitRequests[strTarget] = tPendingPlayerQuery
-      
-      Apollo.CreateTimer("Communicator_TraitQueue", 1, false)
+      self.tmeTraitQueue:Start()
     end
     
     return tTrait.data, tTrait.revision
@@ -432,8 +431,7 @@ function Communicator:FetchTrait(strTarget, strTraitName)
       table.insert(tPendingPlayerQuery, tRequest)
       
       self.tPendingPlayerTraitRequests[strTarget] = tPendingPlayerQuery
-      
-      Apollo.CreateTimer("Communicator_TraitQueue", 1, false)
+      self.tmrTraitQueue:Start()
     end
     
     return tTrait.data, tTrait.revision
@@ -685,7 +683,7 @@ function Communicator:Internal_SendMessage(mMessage, fCallback)
   
   if not self.bQueueProcessRunning then
     self.bQueueProcessRunning = true
-    Apollo.CreateTimer("Communicator_Queue", 0.5, true)
+    self.tmrQueue:Start()
   end
 end
 
@@ -739,17 +737,26 @@ function Communicator:RegisterAddonProtocolHandler(strAddonProtocol, fHandler)
 end
 
 function Communicator:Internal_SetupTimers()
-  Apollo.RegisterTimerHandler("Communicator_Timeout", "OnTimerTimeout", self)
-  Apollo.RegisterTimerHandler("Communicator_TimeoutShutdown", "OnTimerTimeoutShutdown", self)
-  Apollo.RegisterTimerHandler("Communicator_Queue", "OnTimerProcessMessageQueue", self)
-  Apollo.RegisterTimerHandler("Communicator_QueueShutdown", "OnTimerQueueShutdown", self)
-  Apollo.RegisterTimerHandler("Communicator_Setup", "OnTimerSetup", self)
-  Apollo.RegisterTimerHandler("Communicator_TraitQueue", "OnTimerTraitQueue", self)
-  Apollo.RegisterTimerHandler("Communicator_CleanupCache", "OnTimerCleanupCache", self)
-  Apollo.RegisterTimerHandler("Communicator_ChannelTimer", "OnChannelTimer", self)
+  self.tmrChannel = ApolloTimer.Create(3, false, "OnChannelTimer", self)
+  self.tmrChannel:Stop()  
   
-  Apollo.CreateTimer("Communicator_Setup", 1, false)
-  Apollo.CreateTimer("Communicator_CleanupCache", 60, true)
+  self.tmrQueueShutdown = ApolloTimer.Create(0.1, false, "OnTimerQueueShutdown", self)
+  self.tmrQueueShutdown:Stop()
+  
+  self.tmrTimeout = ApolloTimer.Create(15, true, "OnTimerTimeout", self)
+  self.tmrTimeout:Stop()
+  
+  self.tmrTimeoutShutdown = ApolloTimer.Create(0.1, false, "OnTimerTimeoutShutdown", self)
+  self.tmrTimeoutShutdown:Stop()
+  
+  self.tmrQueue = ApolloTimer.Create(0.5, true, "OnTimerProcessMessageQueue", self)
+  self.tmeQueue:Stop()
+  
+  self.tmrTraitQueue = ApolloTimer.Create(1, false, "OnTimerTraitQueue", self)
+  self.tmrTraitQueue:Stop()
+  
+  self.tmrCleanupCache = ApolloTimer.Create(60, true, "OnTimerCleanupCache", self)
+  self.tmrSetup = ApolloTimer.Create(1, false, "OnTimerSetup", self)
 end
 
 function Communicator:Internal_SetupEventHandlers()
@@ -775,12 +782,13 @@ function Communicator:Internal_SetupChannel(strAddon)
     self.chnChannel = addon.chnCommunicator
   else
     self:Log(Communicator.CodeEnumDebugLevel.Comm, "ICCommLib Channel not ready, trying again in 3 seconds")
-    Apollo.CreateTimer("Communicator_ChannelTimer", 3, true)
+    self.tmrChannel:Start()
   end  
 end
 
 function Communicator:Internal_Reply(mMessage, tPayload)
-  local mReply = Message:new()
+  local mReply = Message:
+  new()
   
   mReply:SetProtocolVersion(mMessage:GetProtocolVersion())
   mReply:SetSequence(mMessage:GetSequence())
@@ -803,19 +811,15 @@ function Communicator:OnChannelTimer()
 end
 
 function Communicator:OnTimerQueueShutdown()
-  Apollo.StopTimer("Communicator_Queue")  -- Stop the timer that processes the MessageQueue
-  
-  self.bQueueProcessRunning = false
-  
+  self.tmrQueue:Stop()  
+  self.bQueueProcessRunning = false  
   self:Log(Communicator.CodeEnumDebugLevel.Debug, "MessageQueue is empty. Stopping Processing")
 end
 
 function Communicator:OnTimerProcessMessageQueue()
   if self.qPendingMessages:GetSize() == 0 then
     self:Log(Communicator.CodeEnumDebugLevel.Debug, "OnTimerProcessMessageQueue: MessageQueue is empty, shutting down")
-    
-    Apollo.CreateTimer("Communicator_QueueShutdown", 0.1, false)
-    
+    self.tmrQueueShutdown:Start()    
     return
   end
   
@@ -829,13 +833,13 @@ function Communicator:OnTimerProcessMessageQueue()
   end
   
   if not self.bTimeoutRunning then
-    self.bTimeoutRunnin = true
-    Apollo.CreateTimer("Communicator_Timeout", 15, true)
+    self.bTimeoutRunning = true
+    self.tmrTimeout:Start()
   end
 end
 
 function Communicator:OnTimerTimeoutShutdown()
-  Apollo.StopTimer("Communicator_Timeout")
+  self.tmrTimout:Stop()
   self.bTimeoutRunning = false
 end
 
@@ -874,7 +878,7 @@ function Communicator:OnTimerTimeout()
   end
   
   if(nOutgoingCount == 0) then
-    Apollo.CreateTimer("Communicator_TimeoutShutdown", 0.1, false)
+    self.tmrTimeoutShutdown:Start()
   end
 end
 
