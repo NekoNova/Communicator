@@ -321,7 +321,7 @@ function Communicator:FetchTrait(strTarget, strTraitName)
       table.insert(tPendingPlayerQuery, tRequest)
       
       self.tPendingPlayerTraitRequests[strTarget] = tPendingPlayerQuery
-      self.tmeTraitQueue:Start()
+      self.tmrTraitQueue:Start()
     end
     
     return tTrait.data, tTrait.revision
@@ -750,7 +750,7 @@ function Communicator:Internal_SetupTimers()
   self.tmrTimeoutShutdown:Stop()
   
   self.tmrQueue = ApolloTimer.Create(0.5, true, "OnTimerProcessMessageQueue", self)
-  self.tmeQueue:Stop()
+  self.tmrQueue:Stop()
   
   self.tmrTraitQueue = ApolloTimer.Create(1, false, "OnTimerTraitQueue", self)
   self.tmrTraitQueue:Stop()
@@ -806,7 +806,7 @@ end
 -- Timer Callbacks
 ---------------------------------------------------------------------------------------------------
 function Communicator:OnChannelTimer()
-  Apollo.StopTimer("Communicator_ChannelTimer")
+  self.tmrChannel:Stop()
   self:Internal_SetupChannel()
 end
 
