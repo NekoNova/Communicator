@@ -79,7 +79,7 @@ function Message:SetType(eMessageType)
     error("Message: Attempt to set unknown message type: "..tostring(eMessageType))
   end
   
-  if(eMessageType < Message.CodeEnumType.Request or eMessageType > Message.CodeEnumType.Error) then
+  if(eMessageType < Message.CodeEnumMessageType.Request or eMessageType > Message.CodeEnumMessageType.Error) then
     error("Message: Attempt to set unknown message type: "..tostring(eMessageType))
   end
   
