@@ -766,13 +766,13 @@ function Communicator:Internal_SetupChannel(strAddon)
     error(string.format("Communicator failed to load the addon called %s", self.strAddon))
   end
   
-  addon.chnChannelCommunicator = ICCommLib.JoinChannel("Communicator", ICCommLib.CodeEnumICCommChannelType.Global)
-  addon.chnChannel:SetJoinResultFunction("Internal_OnChannelJoined", self)
+  addon.chnCommunicator = ICCommLib.JoinChannel("Communicator", ICCommLib.CodeEnumICCommChannelType.Global)
+  addon.chnCommunicator:SetJoinResultFunction("Internal_OnChannelJoined", self)
   
-  if addon.chnChannel:IsReady() then
+  if addon.chnCommunicator:IsReady() then
     self:Log(Communicator.CodeEnumDebugLevel.Comm, "ICCommLib Channel successfully created")
-    addon.chnChannel:SetReceivedMessageFunction("Internal_OnChannelMessageReceived", self)
-    self.chnChannel = addon.chnChannel
+    addon.chnCommunicator:SetReceivedMessageFunction("Internal_OnChannelMessageReceived", self)
+    self.chnChannel = addon.chnCommunicator
   else
     self:Log(Communicator.CodeEnumDebugLevel.Comm, "ICCommLib Channel not ready, trying again in 3 seconds")
     Apollo.CreateTimer("Communicator_ChannelTimer", 3, true)
