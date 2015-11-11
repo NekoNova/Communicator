@@ -388,7 +388,7 @@ function Communicator:OnTimerTraitQueue()
     mMessage:SetPayload(aRequests)
     
     -- Send the message to the target, and clear it from the Queue.
-    self:SendMessage(mMessage)
+    self:Internal_SendMessage(mMessage)
     self.tPendingPlayerTraitRequests[strTarget] = nil
   end
 end
@@ -497,7 +497,7 @@ function Communicator:QueryVersion(strTarget)
     mMessage:SetCommand("version")
     mMessage:SetPayload({""})
     
-    self:SendMessage(mMessage)
+    self:Internal_SendMessage(mMessage)
   end
   
   return tVersionInfo.version, tVersionInfo.addons
@@ -527,7 +527,7 @@ function Communicator:GetAllTraits(strTarget)
     mMessage:SetType(Message.CodeEnumMessageType.Request)
     mMessage:SetCommand(Communicator.CodeEnumTrait.All)
     
-    self:SendMessage(mMessage)
+    self:Internal_SendMessage(mMessage)
     self:MarkAddonProtocolCommand(strTarget, nil, Communicator.CodeEnumTrait.All)
   end
   
@@ -825,7 +825,7 @@ function Communicator:OnTimerProcessMessageQueue()
   if channel.SendPrivateMessage ~= nil then
     channel:SendPrivateMessage(mMessage:GetDestination(), mMessage:Serialize())
   else
-    channel:SendMessage(mMessage:Serialize())
+    channel:Internal_SendMessage(mMessage:Serialize())
   end
   
   if not self.bTimeoutRunning then
@@ -913,7 +913,7 @@ function Communicator:OnTimerTraitQueue()
     mMessage:SetPayload(aRequests)
     
     -- Send the message to the target, and clear it from the Queue.
-    self:SendMessage(mMessage)
+    self:Internal_SendMessage(mMessage)
     self.tPendingPlayerTraitRequests[strTarget] = nil
   end
 end
