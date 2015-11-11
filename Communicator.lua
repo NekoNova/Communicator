@@ -699,7 +699,7 @@ function Communicator:Internal_CacheLocalTrait(strTrait, tData, nRevision)
     revision = nRevision
   }
   
-  Event_FireGenericEvent("Communicator_TraitChanged", { player = self:GetOriginName(), trait = strTrait, data = data, revision = nRevision })  
+  Event_FireGenericEvent("Communicator_TraitChanged", { player = self:GetOriginName(), trait = strTrait, data = tData, revision = nRevision })  
 end
 
 function Communicator:Internal_CachePlayerTrait(strTarget, strTrait, tData, nRevision)
@@ -925,4 +925,5 @@ function Communicator:Initialize()
   Apollo.RegisterPackage(self, MAJOR, MINOR, { })
 end
 
-Communicator:Initialize()
+local CommInstance = Communicator:new()
+CommInstance:Initialize()
