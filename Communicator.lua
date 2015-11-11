@@ -493,7 +493,7 @@ function Communicator:QueryVersion(strTarget)
     local mMessage = Message:new()
     
     mMessage:SetDestination(strTarget)
-    mMessage:SetType(Message.CodeEnumType.Request)
+    mMessage:SetType(Message.CodeEnumMessageType.Request)
     mMessage:SetCommand("version")
     mMessage:SetPayload({""})
     
@@ -524,7 +524,7 @@ function Communicator:GetAllTraits(strTarget)
     local mMessage = Message:new()
     
     mMessage:SetDestination(strTarget)
-    mMessage:SetType(Message.CodeEnumType.Request)
+    mMessage:SetType(Message.CodeEnumMessageType.Request)
     mMessage:SetCommand(Communicator.CodeEnumTrait.All)
     
     self:SendMessage(mMessage)
@@ -576,7 +576,7 @@ end
 --  behaviour and internal workings of Communicator.
 ---------------------------------------------------------------------------------------------------
 function Communicator:Internal_ProcessMessage(mMessage)
-  if(mMessage:GetType() == Message.CodeEnumType.Error) then    
+  if(mMessage:GetType() == Message.CodeEnumMessageType.Error) then    
     local tData = self.tOutGoingRequests[mMessage:GetSequence()] or {}
     
     if tData.handler then
@@ -590,7 +590,7 @@ function Communicator:Internal_ProcessMessage(mMessage)
     local eType = mMessage:GetType()
     local tPayload = mMessage:GetPayload() or {}
   
-    if(eType == Message.CodeEnumType.Request) then
+    if(eType == Message.CodeEnumMessageType.Request) then
       if(mMessage:GetCommand() == "get") then
         local aReplies = {}
         
@@ -630,11 +630,11 @@ function Communicator:Internal_ProcessMessage(mMessage)
       else        
         local mReply = self:Internal_Reply(mMessage, { error = self.CodeEnumError.UnimplementedCommand })
         
-        mReply:SetType(Message.CodeEnumType.Error)
+        mReply:SetType(Message.CodeEnumMessageType.Error)
         
         self:Internal_SendMessage(mReply)
       end
-    elseif(eType == Message.CodeEnumType.Reply) then
+    elseif(eType == Message.CodeEnumMessageType.Reply) then
       if(mMessage:GetCommand() == "get") then
         for _, tTrait in ipairs(tPayload) do
           self:CacheTrait(mMessage:GetOrigin(), tTrait.trait, tTrait.data, tTrait.revision)
@@ -644,7 +644,7 @@ function Communicator:Internal_ProcessMessage(mMessage)
       elseif(mMessage:GetCommand() == Communicator.CodeEnumTrait.All) then
         self:StoreAllTraits(mMessage:GetOrigin(), tPayload)
       end
-    elseif(eType == Message.CodeEnumType.Error) then
+    elseif(eType == Message.CodeEnumMessageType.Error) then
       if(mMessage:GetCommand() == Communicator.CodeEnumTrait.All) then
         Event_FireGenericEvent("Communicator_PlayerUpdated", { player = mMessage:GetOrigin(), unsupported = true })
       end
@@ -656,16 +656,16 @@ function Communicator:Internal_ProcessMessage(mMessage)
       for _, fHandler in ipairs(aAddon) do
         fHandler(mMessage)
       end
-    elseif mMessage:GetType() == Message.CodeEnumType.Request then
+    elseif mMessage:GetType() == Message.CodeEnumMessageType.Request then
       local mError = self:Internal_Reply(mMessage, { type = Communicator.CodeEnumError.UnimplementedProtocol })
       
-      mError:SetType(Message.CodeEnumType.Error)
+      mError:SetType(Message.CodeEnumMessageType.Error)
       
       self:Internal_SendMessage(mError)
     end
   end
     
-  if mMessage:GetType() == Message.CodeEnumType.Reply or mMessage:GetType() == Message.CodeEnumType.Error then
+  if mMessage:GetType() == Message.CodeEnumMessageType.Reply or mMessage:GetType() == Message.CodeEnumMessageType.Error then
     self.tOutGoingRequests[mMessage:GetSequence()] = nil
   end
 end
@@ -675,7 +675,7 @@ function Communicator:Internal_SendMessage(mMessage, fCallback)
     return
   end
   
-  if mMessage:GetType() ~= Message.CodeEnumType.Error and mMessage:GetType() ~= Message.CodeEnumType.Reply then
+  if mMessage:GetType() ~= Message.CodeEnumMessageType.Error and mMessage:GetType() ~= Message.CodeEnumMessageType.Reply then
     self.nSequenceCounter = tonumber(self.nSequenceCounter or 0) + 1
     mMessage:SetSequence(self.nSequenceCounter)
   end
@@ -852,7 +852,7 @@ function Communicator:OnTimerTimeout()
       }
       local mError = self:Internal_Reply(tData.message, tPayload)
       
-      mError:SetType(Message.CodeEnumType.Error)
+      mError:SetType(Message.CodeEnumMessageType.Error)
       
       self:Internal_ProcessMessage(mError)
       self.tOutGoingRequests[nSequence] = nil
