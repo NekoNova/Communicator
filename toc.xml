@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<Addon Author="Tenpi" APIVersion="10" Name="Communicator" Description="Library for RP Communications" Version="0.0.1">
-    <Script Name="LibJSON-2.5.lua"/>
-    <Script Name="communicator.lua"/>
-</Addon>
