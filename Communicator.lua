@@ -378,7 +378,7 @@ end
 function Communicator:OnTimerTraitQueue()
   -- Loop over every message in the Queue.
   for strTarget, aRequests in pairs(self.tPendingPlayerTraitRequests) do
-    self:Log(Communicator.CodeEnumDebug.Comm, "Sending: " .. table.getn(aRequests) .. " queued trait requests to " .. strTarget)
+    self:Log(Communicator.CodeEnumDebugLevel.Comm, "Sending: " .. table.getn(aRequests) .. " queued trait requests to " .. strTarget)
     
     local mMessage = Message:new()
     
@@ -399,7 +399,7 @@ function Communicator:FetchTrait(strTarget, strTraitName)
   if(strTarget == nil or strTarget == self:GetOriginName()) then
     local tTrait = self.tLocalTraits[strTraitName] or {}
     
-    self:Log(Communicator.CodeEnumDebug.Access, string.format("Fetching own %s: (%d) %s", strTraitName, tTrait.revision or 0, tostring(tTrait.data)))
+    self:Log(Communicator.CodeEnumDebugLevel.Access, string.format("Fetching own %s: (%d) %s", strTraitName, tTrait.revision or 0, tostring(tTrait.data)))
     
     return tTrait.data, tTrait.revision
   else
@@ -408,7 +408,7 @@ function Communicator:FetchTrait(strTarget, strTraitName)
     local tTrait = tPlayerTraits[strTraitName] or {}
     local nTTL = Communicator.CodeEnumTTL.Trait
     
-    self:Log(Communicator.CodeEnumDebug.Access, string.format("Fetching %s's %s: (%d) %s", strTarget, strTraitName, tTrait.revision or 0, tostring(tTrait.data)))
+    self:Log(Communicator.CodeEnumDebugLevel.Access, string.format("Fetching %s's %s: (%d) %s", strTarget, strTraitName, tTrait.revision or 0, tostring(tTrait.data)))
     
     -- Check if the TTL is set correctly, and do so if not.    
     if ((tTrait.revision or 0) == 0) then
@@ -427,7 +427,7 @@ function Communicator:FetchTrait(strTarget, strTraitName)
       local tPendingPlayerQuery = self.tPendingPlayerTraitRequests[strTarget] or {}
       local tRequest = { trait = strTraitName, revision = tTrait.revision or 0 }
       
-      self:Log(Communicator.CodeEnumDebug.Access, string.format("Building up query to retrieve %s's %s:", strTarget, strTraitName))
+      self:Log(Communicator.CodeEnumDebugLevel.Access, string.format("Building up query to retrieve %s's %s:", strTarget, strTraitName))
       
       table.insert(tPendingPlayerQuery, tRequest)
       
@@ -512,13 +512,13 @@ function Communicator:StoreVersion(strTarget, strVersion, aProtocols)
   tPlayerTraits["__rpVersion"] = { version = strVersion, protocols = aProtocols, time = os.time() }
   self.tCachedPlayerData[strTarget] = tPlayerTraits
   
-  self:Log(Communicator.CodeEnumDebug.Access, string.format("Storing %s's version: %s", strTarget, strVersion))
+  self:Log(Communicator.CodeEnumDebugLevel.Access, string.format("Storing %s's version: %s", strTarget, strVersion))
   Event_FireGenericEvent("Communicator_VersionUpdated", { player = strTarget, version = strVersion, protocols = aProtocols })
 end
 
 function Communicator:GetAllTraits(strTarget)
   local tPlayerTraits = self.tCachedPlayerData[strTarget] or {}
-  self:Log(Communicator.CodeEnumDebug.Access, string.format("Fetching %s's full trait set (version: %s)", strTarget, Communicator.Version))
+  self:Log(Communicator.CodeEnumDebugLevel.Access, string.format("Fetching %s's full trait set (version: %s)", strTarget, Communicator.Version))
   
   if(self:TimeSinceLastAddonProtocolCommand(strTarget, nil, Communicator.CodeEnumTrait.All) > Communicator.CodeEnumTTL.GetAll) then
     local mMessage = Message:new()
@@ -543,7 +543,7 @@ function Communicator:GetAllTraits(strTarget)
 end
 
 function Communicator:StoreAllTraits(strTarget, tPlayerTraits)
-  self:Log(Communicator.CodeEnumDebug.Access, string.format("Storing new trait cache for %s", strTarget))
+  self:Log(Communicator.CodeEnumDebugLevel.Access, string.format("Storing new trait cache for %s", strTarget))
   self.tCachedPlayerData[strTarget] = tPlayerTraits
   
   local tResult = {}
@@ -903,7 +903,7 @@ end
 function Communicator:OnTimerTraitQueue()
   -- Loop over every message in the Queue.
   for strTarget, aRequests in pairs(self.tPendingPlayerTraitRequests) do
-    self:Log(Communicator.CodeEnumDebug.Comm, "Sending: " .. table.getn(aRequests) .. " queued trait requests to " .. strTarget)
+    self:Log(Communicator.CodeEnumDebugLevel.Comm, "Sending: " .. table.getn(aRequests) .. " queued trait requests to " .. strTarget)
     
     local mMessage = Message:new()
     
