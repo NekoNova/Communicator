@@ -77,7 +77,7 @@ function Communicator:new(o)
   o.bTimeoutRunning = false
   o.nSequenceCounter = 0
   o.nDebugLevel = 0
-  o.qPendingMessages = MessageQueue:new()
+  o.qPendingMessages = Queue:new()
   o.kstrRPStateStrings = {
     "In-Character, Not Available for RP",
     "Available for RP",
